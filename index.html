@@ -3,83 +3,583 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MatchForge — Game Server Matchmaking Visualizer</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>CSE201 · Multiplayer Game Server Matchmaking System</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --muted: #475569;
+      --blue: #0284c7;
+      --blue-dark: #0369a1;
+      --teal: #0d9488;
+      --green: #16a34a;
+      --amber: #d97706;
+      --red: #dc2626;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+      padding: 1.25rem;
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+    .topbar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: 4px solid var(--blue);
+      border-radius: 10px;
+      padding: 1.1rem 1.4rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+    }
+    .course-tag {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--blue);
+      text-transform: uppercase;
+    }
+    .brand h1 { font-size: 1.3rem; color: var(--text); margin: 0.15rem 0; }
+    .subtitle { font-size: 0.84rem; font-family: var(--mono); color: var(--muted); }
+    .header-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .btn {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.55rem 0.95rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #f8fafc;
+      color: var(--text);
+    }
+    .btn:hover { background: #e2e8f0; }
+    .btn.primary { background: var(--blue); border-color: var(--blue); color: #ffffff; }
+    .btn.primary:hover { background: var(--blue-dark); }
+    .btn.demo { background: #f0fdfa; border-color: var(--teal); color: var(--teal); }
+    .btn.demo:hover { background: #ccfbf1; }
+    .btn.danger { background: #fef2f2; border-color: #fecaca; color: var(--red); }
+    .btn.danger:hover { background: #fee2e2; }
+    .metrics-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 800px) { .metrics-strip { grid-template-columns: repeat(2, 1fr); } }
+    .metric-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .metric-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+    .metric-val { font-family: var(--mono); font-weight: 700; font-size: 0.95rem; color: var(--blue-dark); }
+    .grid-layout { display: grid; grid-template-columns: 1fr 1.25fr; gap: 1.25rem; }
+    @media (max-width: 960px) { .grid-layout { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+    .panel h2 { font-size: 1.05rem; color: var(--blue-dark); border-bottom: 1px solid var(--border); padding-bottom: 0.55rem; }
+    .panel h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 0.5rem; }
+    .hint { font-size: 0.84rem; color: var(--muted); }
+    .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-grid label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem; font-weight: 600; }
+    input, select {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.65rem;
+      font-size: 0.85rem;
+      font-family: var(--mono);
+      background: #ffffff;
+      color: var(--text);
+    }
+    input:focus, select:focus { outline: none; border-color: var(--blue); }
+    .btn-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .fifo-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      min-height: 130px;
+    }
+    .queue-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--teal);
+      border-radius: 6px;
+      padding: 0.55rem 0.8rem;
+      font-family: var(--mono);
+      font-size: 0.84rem;
+    }
+    .queue-item.front { border-left-color: var(--blue); background: #f0f9ff; }
+    .queue-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: #e0f2fe;
+      color: var(--blue-dark);
+    }
+    .empty-msg { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 1.5rem 0; }
+    .log-list {
+      list-style: none;
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 0.8rem;
+      height: 215px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .log-list li { border-bottom: 1px solid #1e293b; padding-bottom: 0.3rem; }
+    .log-match { color: #4ade80; }
+    .log-update { color: #38bdf8; }
+    .log-heap { color: #c084fc; }
+    .log-wait { color: #facc15; }
+    .log-err { color: #f87171; }
+    .heap-array {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+    .heap-node {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      min-width: 122px;
+    }
+    .heap-node.root { border: 2px solid var(--green); background: #f0fdf4; }
+    .heap-idx { font-size: 0.68rem; color: var(--muted); }
+    .server-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.75rem; }
+    .server-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .server-card.status-selected { border: 2px solid var(--green); background: #f0fdf4; }
+    .server-card.status-higher { border-color: var(--amber); }
+    .server-card.status-rejected { opacity: 0.85; }
+    .server-top { display: flex; justify-content: space-between; font-family: var(--mono); font-weight: 700; font-size: 0.9rem; }
+    .server-sub { font-size: 0.78rem; font-family: var(--mono); color: var(--muted); }
+    .decision-tag {
+      font-size: 0.73rem;
+      font-family: var(--mono);
+      font-weight: 700;
+      padding: 0.2rem 0.45rem;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .tag-selected { background: #dcfce7; color: var(--green); }
+    .tag-higher { background: #fef3c7; color: var(--amber); }
+    .tag-rejected { background: #fee2e2; color: var(--red); }
+    .bar-bg { width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; background: var(--green); transition: width 0.25s ease; }
+    .bar-fill.med { background: var(--amber); }
+    .bar-fill.high { background: var(--red); }
+    .footer {
+      margin-top: 1.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+      padding: 0.75rem;
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <h1>MatchForge</h1>
-      <span class="badge">C Engine Simulation • Circular FIFO + Binary Min-Heap</span>
+      <div class="course-tag">CSE201 · Data Structures Mini Project</div>
+      <h1>Multiplayer Game Server Matchmaking System</h1>
+      <div class="subtitle">Optimized Server Allocation Using FIFO Queue &amp; Binary Min-Heap</div>
     </div>
     <div class="header-actions">
-      <button id="btn-step" class="btn primary">Process Next Match (1 Tick)</button>
-      <button id="btn-auto" class="btn secondary">Auto-Tick: OFF</button>
-      <button id="btn-reset" class="btn danger">Reset Engine</button>
+      <button type="button" id="btn-demo" class="btn demo">Load PPT Demo</button>
+      <button type="button" id="btn-step" class="btn primary">Match Next Player</button>
+      <button type="button" id="btn-auto" class="btn">Auto-Run: OFF</button>
+      <button type="button" id="btn-reset" class="btn danger">Reset</button>
     </div>
   </header>
 
+  <section class="metrics-strip">
+    <div class="metric-card">
+      <span class="metric-label">Enqueue / Dequeue</span>
+      <span class="metric-val">O(1)</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Extract-Min / Heapify</span>
+      <span class="metric-val">O(log n)</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Waiting in Queue</span>
+      <span class="metric-val" id="stat-waiting">0</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Players Matched</span>
+      <span class="metric-val" id="stat-matched">0</span>
+    </div>
+  </section>
+
   <main class="grid-layout">
-    <!-- Left Column: Enqueue Player & Engine Logs -->
     <section class="panel">
-      <h2>1. Enqueue Player (Circular FIFO)</h2>
+      <h2>1. Player Request &amp; FIFO Waiting Queue</h2>
       <form id="enqueue-form" class="form-grid">
         <label>
-          Player ID
-          <input type="text" id="player-id" placeholder="e.g. PLR-101" required />
+          Player / Party Name
+          <input type="text" id="player-id" placeholder="e.g. Player_A" required />
         </label>
         <label>
           Region
           <select id="player-region">
-            <option value="AP-SOUTH">AP-SOUTH (Mumbai)</option>
-            <option value="AP-SOUTHEAST">AP-SOUTHEAST (Singapore)</option>
-            <option value="EU-CENTRAL">EU-CENTRAL (Frankfurt)</option>
+            <option value="India">India</option>
+            <option value="Singapore">Singapore</option>
+            <option value="Europe">Europe</option>
           </select>
         </label>
         <label>
-          Game Mode
-          <select id="player-mode">
-            <option value="5v5-RANKED">5v5-RANKED</option>
-            <option value="BATTLE-ROYALE">BATTLE-ROYALE</option>
-            <option value="DEATHMATCH">DEATHMATCH</option>
-          </select>
+          Party Size (Slots)
+          <input type="number" id="player-slots" min="1" max="20" value="4" required />
         </label>
         <div class="btn-row">
-          <button type="submit" class="btn primary">Enqueue Player</button>
-          <button type="button" id="btn-burst" class="btn secondary">+5 Random Players</button>
+          <button type="submit" class="btn primary">+ Enqueue Player</button>
+          <button type="button" id="btn-random" class="btn">+3 Random Players</button>
         </div>
       </form>
 
-      <div class="queue-status">
-        <h3>FIFO Queue Buffer (<span id="queue-count">0</span> / <span id="queue-cap">12</span>)</h3>
-        <div id="fifo-container" class="fifo-track"></div>
+      <div>
+        <h3>Waiting Queue — FIFO Order (<span id="queue-count">0</span> waiting)</h3>
+        <div id="fifo-list" class="fifo-list"></div>
       </div>
 
-      <div class="log-panel">
-        <h3>Engine Execution Log</h3>
+      <div>
+        <h3>System Output Log</h3>
         <ul id="log-list" class="log-list"></ul>
       </div>
     </section>
 
-    <!-- Right Column: Binary Min-Heap & Server Fleet -->
     <section class="panel">
-      <h2>2. Server Fleet & Binary Min-Heap (Lowest Load Root)</h2>
+      <h2>2. Binary Min-Heap &amp; Active Servers</h2>
       <p class="hint">
-        Min-Heap orders servers by <strong>Active Load %</strong>. Matchmaker extracts the lowest-load eligible server matching Region, Mode, and Capacity.
+        Min-Heap orders servers by <strong>Current Load %</strong>. Matchmaker filters by <strong>Region</strong> and <strong>Available Slots &ge; Party Size</strong>, then extracts the lowest-load eligible server.
       </p>
 
-      <div class="heap-section">
-        <h3>Min-Heap Array Representation (Index 0 = Min Load Root)</h3>
+      <div>
+        <h3>Binary Min-Heap Array (Index 0 = Lowest Global Load)</h3>
         <div id="heap-array" class="heap-array"></div>
       </div>
 
-      <div class="fleet-section">
-        <h3>Server Fleet Telemetry</h3>
+      <div>
+        <h3>Active Servers &amp; Allocation Decisions</h3>
         <div id="server-grid" class="server-grid"></div>
       </div>
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <footer class="footer">
+    CSE201 Data Structures Mini Project · Ashrit Reddy (NB25ISE273) · Vineet Dadhwal (NB25ISE269) · Hari Narayanan (NB25ISE264) · Vinayak Raj (NB25ISE268)
+  </footer>
+
+  <script>
+    class PlayerFIFOQueue {
+      constructor() { this.items = []; }
+      enqueue(player) { this.items.push(player); }
+      dequeue() { return this.items.length > 0 ? this.items.shift() : null; }
+      peek() { return this.items.length > 0 ? this.items[0] : null; }
+      isEmpty() { return this.items.length === 0; }
+      size() { return this.items.length; }
+    }
+
+    class ServerMinHeap {
+      constructor() { this.heap = []; }
+      getLoadPercent(server) { return (server.usedSlots / server.capacity) * 100; }
+      swap(i, j) { [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]]; }
+      heapifyUp(index) {
+        while (index > 0) {
+          const parent = Math.floor((index - 1) / 2);
+          if (this.getLoadPercent(this.heap[index]) < this.getLoadPercent(this.heap[parent])) {
+            this.swap(index, parent);
+            index = parent;
+          } else break;
+        }
+      }
+      heapifyDown(index) {
+        const n = this.heap.length;
+        while (true) {
+          let smallest = index;
+          const left = 2 * index + 1;
+          const right = 2 * index + 2;
+          if (left < n && this.getLoadPercent(this.heap[left]) < this.getLoadPercent(this.heap[smallest])) smallest = left;
+          if (right < n && this.getLoadPercent(this.heap[right]) < this.getLoadPercent(this.heap[smallest])) smallest = right;
+          if (smallest !== index) { this.swap(index, smallest); index = smallest; }
+          else break;
+        }
+      }
+      insert(server) { this.heap.push(server); this.heapifyUp(this.heap.length - 1); }
+      extractMin() {
+        if (this.heap.length === 0) return null;
+        if (this.heap.length === 1) return this.heap.pop();
+        const min = this.heap[0];
+        this.heap[0] = this.heap.pop();
+        this.heapifyDown(0);
+        return min;
+      }
+    }
+
+    const DEFAULT_SERVERS = [
+      { id: "IND-01", region: "India", capacity: 100, usedSlots: 40 },
+      { id: "IND-02", region: "India", capacity: 100, usedSlots: 80 },
+      { id: "SG-01", region: "Singapore", capacity: 100, usedSlots: 30 },
+      { id: "SG-02", region: "Singapore", capacity: 100, usedSlots: 65 },
+      { id: "EU-01", region: "Europe", capacity: 100, usedSlots: 25 }
+    ];
+
+    let playerQueue = new PlayerFIFOQueue();
+    let serverHeap = new ServerMinHeap();
+    let playerCounter = 1;
+    let matchedCount = 0;
+    let autoTimer = null;
+    let serverDecisions = {};
+
+    function addLog(text, cssClass = "") {
+      const logList = document.getElementById("log-list");
+      const li = document.createElement("li");
+      if (cssClass) li.className = cssClass;
+      li.textContent = text;
+      logList.prepend(li);
+    }
+
+    function initSystem(loadSlideDemo = false) {
+      playerQueue = new PlayerFIFOQueue();
+      serverHeap = new ServerMinHeap();
+      serverDecisions = {};
+      matchedCount = 0;
+      document.getElementById("log-list").innerHTML = "";
+      DEFAULT_SERVERS.forEach(s => serverHeap.insert({ ...s }));
+
+      if (loadSlideDemo) {
+        playerQueue.enqueue({ name: "Player_A", region: "India", slots: 4 });
+        playerQueue.enqueue({ name: "Player_B", region: "Singapore", slots: 2 });
+        playerQueue.enqueue({ name: "Player_C", region: "India", slots: 8 });
+        playerCounter = 4;
+        addLog("[INIT] Loaded PPT Demo Scenario (Player_A, Player_B, Player_C).", "log-update");
+        addLog("[WAIT] Player_A (India · 4 slots) is at front of FIFO queue.", "log-wait");
+      } else {
+        playerCounter = 1;
+        addLog("[INIT] Matchmaking Engine Ready. Enqueue players to begin.", "log-update");
+      }
+      document.getElementById("player-id").value = `Player_${playerCounter}`;
+      renderAll();
+    }
+
+    function matchNextPlayer() {
+      if (playerQueue.isEmpty()) {
+        addLog("[WARN] Waiting Queue is empty. Enqueue a player first.", "log-err");
+        return;
+      }
+      const player = playerQueue.dequeue();
+      serverDecisions = {};
+      const deferred = [];
+      let selectedServer = null;
+
+      while (serverHeap.heap.length > 0) {
+        const srv = serverHeap.extractMin();
+        const availableSlots = srv.capacity - srv.usedSlots;
+        if (srv.region !== player.region) {
+          serverDecisions[srv.id] = { type: "rejected", label: "✗ REJECTED (Region Mismatch)" };
+          deferred.push(srv);
+        } else if (availableSlots < player.slots) {
+          serverDecisions[srv.id] = { type: "rejected", label: "✗ REJECTED (Insufficient Slots)" };
+          deferred.push(srv);
+        } else if (!selectedServer) {
+          selectedServer = srv;
+          serverDecisions[srv.id] = { type: "selected", label: "✓ SELECTED (Suitable & Lowest Load)" };
+        } else {
+          serverDecisions[srv.id] = { type: "higher", label: "△ Eligible, but higher load" };
+          deferred.push(srv);
+        }
+      }
+      deferred.forEach(srv => serverHeap.insert(srv));
+
+      if (selectedServer) {
+        const oldPct = Math.round((selectedServer.usedSlots / selectedServer.capacity) * 100);
+        selectedServer.usedSlots += player.slots;
+        const newPct = Math.round((selectedServer.usedSlots / selectedServer.capacity) * 100);
+        serverHeap.insert(selectedServer);
+        matchedCount++;
+
+        addLog(`[MATCH] ${player.name} (${player.region} · ${player.slots} slots) → ${selectedServer.id}`, "log-match");
+        addLog(`[UPDATE] ${selectedServer.id} load updated: ${oldPct}% → ${newPct}%`, "log-update");
+        addLog(`[HEAP] Min-Heap re-heapified`, "log-heap");
+      } else {
+        addLog(`[REJECTED] No eligible server found for ${player.name} (${player.region} · ${player.slots} slots).`, "log-err");
+      }
+
+      if (!playerQueue.isEmpty()) {
+        const next = playerQueue.peek();
+        addLog(`[WAIT] ${next.name} (${next.region} · ${next.slots} slots) next in queue`, "log-wait");
+      } else {
+        addLog(`[IDLE] All players in FIFO queue processed.`, "log-wait");
+      }
+      renderAll();
+    }
+
+    function renderQueue() {
+      const list = document.getElementById("fifo-list");
+      document.getElementById("queue-count").textContent = playerQueue.size();
+      document.getElementById("stat-waiting").textContent = playerQueue.size();
+      document.getElementById("stat-matched").textContent = matchedCount;
+      list.innerHTML = "";
+      if (playerQueue.isEmpty()) {
+        list.innerHTML = `<div class="empty-msg">Queue is empty. Add a player above or click "Load PPT Demo".</div>`;
+        return;
+      }
+      playerQueue.items.forEach((p, index) => {
+        const div = document.createElement("div");
+        div.className = "queue-item" + (index === 0 ? " front" : "");
+        div.innerHTML = `
+          <span><strong>#${index + 1} ${p.name}</strong> (${p.region} · ${p.slots} slots)</span>
+          <span class="queue-badge">${index === 0 ? "NEXT (HEAD)" : "WAITING"}</span>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function renderHeap() {
+      const container = document.getElementById("heap-array");
+      container.innerHTML = "";
+      serverHeap.heap.forEach((srv, idx) => {
+        const pct = Math.round((srv.usedSlots / srv.capacity) * 100);
+        const node = document.createElement("div");
+        node.className = "heap-node" + (idx === 0 ? " root" : "");
+        node.innerHTML = `
+          <div class="heap-idx">Index [${idx}] ${idx === 0 ? "• MIN ROOT" : ""}</div>
+          <div><strong>${srv.id}</strong> (${srv.region})</div>
+          <div>Load: ${pct}%</div>
+        `;
+        container.appendChild(node);
+      });
+    }
+
+    function renderServers() {
+      const grid = document.getElementById("server-grid");
+      grid.innerHTML = "";
+      const sorted = [...serverHeap.heap].sort((a, b) => a.id.localeCompare(b.id));
+      sorted.forEach(srv => {
+        const pct = Math.round((srv.usedSlots / srv.capacity) * 100);
+        const decision = serverDecisions[srv.id];
+        let cardClass = "server-card";
+        let tagHtml = "";
+        if (decision) {
+          cardClass += ` status-${decision.type}`;
+          tagHtml = `<span class="decision-tag tag-${decision.type}">${decision.label}</span>`;
+        }
+        let fillClass = pct >= 80 ? "high" : (pct >= 50 ? "med" : "");
+        const card = document.createElement("div");
+        card.className = cardClass;
+        card.innerHTML = `
+          <div class="server-top"><span>${srv.id}</span><span>Load: ${pct}%</span></div>
+          <div class="server-sub">${srv.region} · ${srv.usedSlots}/${srv.capacity} slots used</div>
+          <div class="bar-bg"><div class="bar-fill ${fillClass}" style="width: ${pct}%"></div></div>
+          ${tagHtml}
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderAll() { renderQueue(); renderHeap(); renderServers(); }
+
+    document.getElementById("enqueue-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const nameInput = document.getElementById("player-id");
+      const region = document.getElementById("player-region").value;
+      const slots = parseInt(document.getElementById("player-slots").value, 10) || 1;
+      const name = nameInput.value.trim() || `Player_${playerCounter}`;
+      playerQueue.enqueue({ name, region, slots });
+      addLog(`[ENQUEUE] ${name} (${region} · ${slots} slots) added to FIFO queue.`, "log-wait");
+      playerCounter++;
+      nameInput.value = `Player_${playerCounter}`;
+      renderAll();
+    });
+
+    document.getElementById("btn-random").addEventListener("click", () => {
+      const regions = ["India", "Singapore", "Europe"];
+      const slotOptions = [1, 2, 4, 5];
+      for (let i = 0; i < 3; i++) {
+        playerQueue.enqueue({
+          name: `Player_${playerCounter++}`,
+          region: regions[Math.floor(Math.random() * regions.length)],
+          slots: slotOptions[Math.floor(Math.random() * slotOptions.length)]
+        });
+      }
+      document.getElementById("player-id").value = `Player_${playerCounter}`;
+      addLog("[ENQUEUE] Added 3 random player requests to FIFO queue.", "log-wait");
+      renderAll();
+    });
+
+    document.getElementById("btn-demo").addEventListener("click", () => initSystem(true));
+    document.getElementById("btn-step").addEventListener("click", matchNextPlayer);
+    document.getElementById("btn-auto").addEventListener("click", e => {
+      if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+        e.target.textContent = "Auto-Run: OFF";
+      } else {
+        autoTimer = setInterval(() => { if (!playerQueue.isEmpty()) matchNextPlayer(); }, 1500);
+        e.target.textContent = "Auto-Run: ON";
+      }
+    });
+    document.getElementById("btn-reset").addEventListener("click", () => {
+      if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+        document.getElementById("btn-auto").textContent = "Auto-Run: OFF";
+      }
+      initSystem(false);
+    });
+
+    initSystem(true);
+  </script>
 </body>
 </html>
