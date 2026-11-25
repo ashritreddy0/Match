@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MatchForge — Game Server Matchmaking Visualizer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>MatchForge</h1>
+      <span class="badge">C Engine Simulation • Circular FIFO + Binary Min-Heap</span>
+    </div>
+    <div class="header-actions">
+      <button id="btn-step" class="btn primary">Process Next Match (1 Tick)</button>
+      <button id="btn-auto" class="btn secondary">Auto-Tick: OFF</button>
+      <button id="btn-reset" class="btn danger">Reset Engine</button>
+    </div>
+  </header>
+
+  <main class="grid-layout">
+    <!-- Left Column: Enqueue Player & Engine Logs -->
+    <section class="panel">
+      <h2>1. Enqueue Player (Circular FIFO)</h2>
+      <form id="enqueue-form" class="form-grid">
+        <label>
+          Player ID
+          <input type="text" id="player-id" placeholder="e.g. PLR-101" required />
+        </label>
+        <label>
+          Region
+          <select id="player-region">
+            <option value="AP-SOUTH">AP-SOUTH (Mumbai)</option>
+            <option value="AP-SOUTHEAST">AP-SOUTHEAST (Singapore)</option>
+            <option value="EU-CENTRAL">EU-CENTRAL (Frankfurt)</option>
+          </select>
+        </label>
+        <label>
+          Game Mode
+          <select id="player-mode">
+            <option value="5v5-RANKED">5v5-RANKED</option>
+            <option value="BATTLE-ROYALE">BATTLE-ROYALE</option>
+            <option value="DEATHMATCH">DEATHMATCH</option>
+          </select>
+        </label>
+        <div class="btn-row">
+          <button type="submit" class="btn primary">Enqueue Player</button>
+          <button type="button" id="btn-burst" class="btn secondary">+5 Random Players</button>
+        </div>
+      </form>
+
+      <div class="queue-status">
+        <h3>FIFO Queue Buffer (<span id="queue-count">0</span> / <span id="queue-cap">12</span>)</h3>
+        <div id="fifo-container" class="fifo-track"></div>
+      </div>
+
+      <div class="log-panel">
+        <h3>Engine Execution Log</h3>
+        <ul id="log-list" class="log-list"></ul>
+      </div>
+    </section>
+
+    <!-- Right Column: Binary Min-Heap & Server Fleet -->
+    <section class="panel">
+      <h2>2. Server Fleet & Binary Min-Heap (Lowest Load Root)</h2>
+      <p class="hint">
+        Min-Heap orders servers by <strong>Active Load %</strong>. Matchmaker extracts the lowest-load eligible server matching Region, Mode, and Capacity.
+      </p>
+
+      <div class="heap-section">
+        <h3>Min-Heap Array Representation (Index 0 = Min Load Root)</h3>
+        <div id="heap-array" class="heap-array"></div>
+      </div>
+
+      <div class="fleet-section">
+        <h3>Server Fleet Telemetry</h3>
+        <div id="server-grid" class="server-grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
