@@ -1,63 +1,51 @@
 /**
- * MatchForge — Core Engine Simulation & Visualizer
- * Mirrors the modular C backend:
- * 1. Circular FIFO Queue (fixed buffer capacity, head/tail pointers)
- * 2. Binary Min-Heap (array-backed heap ordered by server load ratio)
- * 3. Eligibility Filter (Region, Game Mode, Remaining Capacity)
+ * CSE201 Data Structures Mini Project
+ * Multiplayer Game Server Matchmaking System
+ * Modules:
+ *  1. FIFO Waiting Queue (O(1) Enqueue / Dequeue)
+ *  2. Binary Min-Heap Priority Queue (O(log n) Extract-Min & Re-Heapify)
+ *  3. Eligibility Rules (Region Match + Available Slots >= Party Size)
  */
 
 // ==========================================
-// 1. CIRCULAR FIFO QUEUE MODULE
+// MODULE 1: FIFO WAITING QUEUE
 // ==========================================
-class CircularFIFOQueue {
-  constructor(capacity = 12) {
-    this.capacity = capacity;
-    this.buffer = new Array(capacity).fill(null);
-    this.head = 0;
-    this.tail = 0;
-    this.count = 0;
-  }
-
-  isFull() {
-    return this.count === this.capacity;
-  }
-
-  isEmpty() {
-    return this.count === 0;
+class PlayerFIFOQueue {
+  constructor() {
+    this.items = [];
   }
 
   enqueue(player) {
-    if (this.isFull()) return false;
-    this.buffer[this.tail] = player;
-    this.tail = (this.tail + 1) % this.capacity;
-    this.count++;
-    return true;
+    this.items.push(player);
   }
 
   dequeue() {
-    if (this.isEmpty()) return null;
-    const player = this.buffer[this.head];
-    this.buffer[this.head] = null;
-    this.head = (this.head + 1) % this.capacity;
-    this.count--;
-    return player;
+    return this.items.length > 0 ? this.items.shift() : null;
   }
 
   peek() {
-    return this.isEmpty() ? null : this.buffer[this.head];
+    return this.items.length > 0 ? this.items[0] : null;
+  }
+
+  isEmpty() {
+    return this.items.length === 0;
+  }
+
+  size() {
+    return this.items.length;
   }
 }
 
 // ==========================================
-// 2. BINARY MIN-HEAP MODULE (Load Balancing)
+// MODULE 2: BINARY MIN-HEAP (PRIORITY QUEUE)
 // ==========================================
 class ServerMinHeap {
   constructor() {
     this.heap = [];
   }
 
-  getLoadRatio(server) {
-    return server.activePlayers / server.maxCapacity;
+  getLoadPercent(server) {
+    return (server.usedSlots / server.capacity) * 100;
   }
 
   swap(i, j) {
@@ -67,7 +55,7 @@ class ServerMinHeap {
   heapifyUp(index) {
     while (index > 0) {
       const parent = Math.floor((index - 1) / 2);
-      if (this.getLoadRatio(this.heap[index]) < this.getLoadRatio(this.heap[parent])) {
+      if (this.getLoadPercent(this.heap[index]) < this.getLoadPercent(this.heap[parent])) {
         this.swap(index, parent);
         index = parent;
       } else {
@@ -77,16 +65,16 @@ class ServerMinHeap {
   }
 
   heapifyDown(index) {
-    const length = this.heap.length;
+    const n = this.heap.length;
     while (true) {
       let smallest = index;
       const left = 2 * index + 1;
       const right = 2 * index + 2;
 
-      if (left < length && this.getLoadRatio(this.heap[left]) < this.getLoadRatio(this.heap[smallest])) {
+      if (left < n && this.getLoadPercent(this.heap[left]) < this.getLoadPercent(this.heap[smallest])) {
         smallest = left;
       }
-      if (right < length && this.getLoadRatio(this.heap[right]) < this.getLoadRatio(this.heap[smallest])) {
+      if (right < n && this.getLoadPercent(this.heap[right]) < this.getLoadPercent(this.heap[smallest])) {
         smallest = right;
       }
 
@@ -113,134 +101,282 @@ class ServerMinHeap {
     this.heapifyDown(0);
     return min;
   }
-
-  rebuild() {
-    for (let i = Math.floor(this.heap.length / 2) - 1; i >= 0; i--) {
-      this.heapifyDown(i);
-    }
-  }
 }
 
 // ==========================================
-// 3. INITIAL SERVER FLEET & ENGINE STATE
+// INITIAL SERVER FLEET & STATE
 // ==========================================
-const INITIAL_SERVERS = [
-  { id: "SRV-MUM-01", region: "AP-SOUTH", mode: "5v5-RANKED", activePlayers: 2, maxCapacity: 10 },
-  { id: "SRV-MUM-02", region: "AP-SOUTH", mode: "BATTLE-ROYALE", activePlayers: 12, maxCapacity: 40 },
-  { id: "SRV-MUM-03", region: "AP-SOUTH", mode: "DEATHMATCH", activePlayers: 6, maxCapacity: 16 },
-  { id: "SRV-SGP-01", region: "AP-SOUTHEAST", mode: "5v5-RANKED", activePlayers: 4, maxCapacity: 10 },
-  { id: "SRV-SGP-02", region: "AP-SOUTHEAST", mode: "BATTLE-ROYALE", activePlayers: 8, maxCapacity: 40 },
-  { id: "SRV-FRA-01", region: "EU-CENTRAL", mode: "5v5-RANKED", activePlayers: 1, maxCapacity: 10 },
-  { id: "SRV-FRA-02", region: "EU-CENTRAL", mode: "DEATHMATCH", activePlayers: 4, maxCapacity: 16 }
+const DEFAULT_SERVERS = [
+  { id: "IND-01", region: "India", capacity: 100, usedSlots: 40 },
+  { id: "IND-02", region: "India", capacity: 100, usedSlots: 80 },
+  { id: "SG-01", region: "Singapore", capacity: 100, usedSlots: 30 },
+  { id: "SG-02", region: "Singapore", capacity: 100, usedSlots: 65 },
+  { id: "EU-01", region: "Europe", capacity: 100, usedSlots: 25 }
 ];
 
-let queue = new CircularFIFOQueue(12);
-let minHeap = new ServerMinHeap();
-let playerCounter = 101;
-let autoTickTimer = null;
-let lastMatchedServerId = null;
+let playerQueue = new PlayerFIFOQueue();
+let serverHeap = new ServerMinHeap();
+let playerCounter = 1;
+let autoTimer = null;
+let serverDecisions = {}; // Stores last walkthrough decision per server ID
 
-function initEngine() {
-  queue = new CircularFIFOQueue(12);
-  minHeap = new ServerMinHeap();
-  playerCounter = 101;
-  lastMatchedServerId = null;
+function addLog(text, cssClass = "") {
+  const logList = document.getElementById("log-list");
+  const li = document.createElement("li");
+  if (cssClass) li.className = cssClass;
+  li.textContent = text;
+  logList.prepend(li);
+}
 
-  INITIAL_SERVERS.forEach(srv => {
-    minHeap.insert({ ...srv });
+function initSystem(loadSlideDemo = false) {
+  playerQueue = new PlayerFIFOQueue();
+  serverHeap = new ServerMinHeap();
+  serverDecisions = {};
+  document.getElementById("log-list").innerHTML = "";
+
+  DEFAULT_SERVERS.forEach(s => {
+    serverHeap.insert({ ...s });
   });
 
-  document.getElementById("log-list").innerHTML = "";
-  logEvent("Engine initialized: Circular FIFO (cap 12) & Binary Min-Heap ready.", "ok");
+  if (loadSlideDemo) {
+    // Exact queue from Slide 8 & 9
+    playerQueue.enqueue({ name: "Player_A", region: "India", slots: 4 });
+    playerQueue.enqueue({ name: "Player_B", region: "Singapore", slots: 2 });
+    playerQueue.enqueue({ name: "Player_C", region: "India", slots: 8 });
+    playerCounter = 4;
+    addLog("[INIT] Loaded PPT Walkthrough Scenario (Player_A, Player_B, Player_C).", "log-update");
+    addLog("[WAIT] Player_A (India · 4 slots) is at front of FIFO queue.", "log-wait");
+  } else {
+    playerCounter = 1;
+    addLog("[INIT] Matchmaking Engine Ready. Enqueue players to begin.", "log-update");
+  }
+
+  document.getElementById("player-id").value = `Player_${playerCounter}`;
   renderAll();
 }
 
 // ==========================================
-// 4. ELIGIBILITY LOGIC & MATCHMAKING TICK
+// MODULE 3: ELIGIBILITY & MATCHMAKING LOGIC
 // ==========================================
-function isServerEligible(server, player) {
-  const regionMatch = server.region === player.region;
-  const modeMatch = server.mode === player.mode;
-  const hasCapacity = server.activePlayers < server.maxCapacity;
-  return regionMatch && modeMatch && hasCapacity;
-}
-
-function processMatchmakingTick() {
-  if (queue.isEmpty()) {
-    logEvent("Tick skipped: Circular FIFO queue is empty.", "warn");
+function matchNextPlayer() {
+  if (playerQueue.isEmpty()) {
+    addLog("[WARN] Waiting Queue is empty. Enqueue a player first.", "log-err");
     return;
   }
 
-  const player = queue.dequeue();
-  const deferredServers = [];
-  let assignedServer = null;
+  const player = playerQueue.dequeue();
+  serverDecisions = {};
 
-  // Pop from Min-Heap until we find the lowest-load eligible server
-  while (minHeap.heap.length > 0) {
-    const candidate = minHeap.extractMin();
-    if (isServerEligible(candidate, player)) {
-      assignedServer = candidate;
-      break;
+  const deferred = [];
+  let selectedServer = null;
+
+  // Extract from Min-Heap in ascending order of load
+  while (serverHeap.heap.length > 0) {
+    const srv = serverHeap.extractMin();
+    const availableSlots = srv.capacity - srv.usedSlots;
+
+    if (srv.region !== player.region) {
+      serverDecisions[srv.id] = {
+        type: "rejected",
+        label: "✗ REJECTED (Region Mismatch)"
+      };
+      deferred.push(srv);
+    } else if (availableSlots < player.slots) {
+      serverDecisions[srv.id] = {
+        type: "rejected",
+        label: "✗ REJECTED (Insufficient Slots)"
+      };
+      deferred.push(srv);
+    } else if (!selectedServer) {
+      // First eligible server extracted from Min-Heap is guaranteed lowest load
+      selectedServer = srv;
+      serverDecisions[srv.id] = {
+        type: "selected",
+        label: "✓ SELECTED (Suitable & Lowest Load)"
+      };
     } else {
-      deferredServers.push(candidate);
+      serverDecisions[srv.id] = {
+        type: "higher",
+        label: "△ Eligible, but higher load"
+      };
+      deferred.push(srv);
     }
   }
 
-  // Re-insert any skipped servers back into the Min-Heap
-  deferredServers.forEach(srv => minHeap.insert(srv));
+  // Re-insert deferred servers into Min-Heap
+  deferred.forEach(srv => serverHeap.insert(srv));
 
-  if (assignedServer) {
-    assignedServer.activePlayers++;
-    minHeap.insert(assignedServer); // Re-insert with updated load
-    lastMatchedServerId = assignedServer.id;
+  if (selectedServer) {
+    const oldPct = Math.round((selectedServer.usedSlots / selectedServer.capacity) * 100);
+    selectedServer.usedSlots += player.slots;
+    const newPct = Math.round((selectedServer.usedSlots / selectedServer.capacity) * 100);
 
-    const loadPct = Math.round((assignedServer.activePlayers / assignedServer.maxCapacity) * 100);
-    logEvent(
-      `MATCHED ${player.id} [${player.region} | ${player.mode}] ->${assignedServer.id} (Load: ${assignedServer.activePlayers}/${assignedServer.maxCapacity} • ${loadPct}\%)`, "ok" ); } else { lastMatchedServerId = null; logEvent( `DROPPED ${player.id} [${player.region} \vert{}${player.mode}]: No eligible server with free capacity.`,
-      "err"
-    );
+    // Re-insert updated server & re-heapify
+    serverHeap.insert(selectedServer);
+
+    addLog(`[MATCH] ${player.name} (${player.region} · ${player.slots} slots) → ${selectedServer.id}`, "log-match");
+    addLog(`[UPDATE] ${selectedServer.id} load updated: ${oldPct}% → ${newPct}%`, "log-update");
+    addLog(`[HEAP] Min-Heap re-heapified`, "log-heap");
+  } else {
+    addLog(`[REJECTED] No eligible server found for ${player.name} (${player.region} · ${player.slots} slots).`, "log-err");
+  }
+
+  if (!playerQueue.isEmpty()) {
+    const next = playerQueue.peek();
+    addLog(`[WAIT] ${next.name} (${next.region} · ${next.slots} slots) next in queue`, "log-wait");
+  } else {
+    addLog(`[IDLE] All players in FIFO queue processed.`, "log-wait");
   }
 
   renderAll();
 }
 
 // ==========================================
-// 5. UI RENDERING & TELEMETRY
+// UI RENDERING
 // ==========================================
-function logEvent(message, type = "ok") {
-  const logList = document.getElementById("log-list");
-  const li = document.createElement("li");
-  const time = new Date().toLocaleTimeString([], { hour12: false });
-  li.className = `log-${type}`; li.textContent = `[${time}] ${message}`; logList.prepend(li); }  function renderFIFOQueue() { const container = document.getElementById("fifo-container"); document.getElementById("queue-count").textContent = queue.count; document.getElementById("queue-cap").textContent = queue.capacity;  container.innerHTML = "";  for (let i = 0; i < queue.capacity; i++) { const slot = document.createElement("div"); const player = queue.buffer[i]; const isHead = !queue.isEmpty() && i === queue.head;  slot.className = "fifo-slot" + (player ? " occupied" : "") + (isHead ? " head" : "");  let pointerLabel = `Slot [${i}]`;
-    if (isHead) pointerLabel += " • HEAD";
-    if (i === queue.tail && !queue.isFull()) pointerLabel += " • TAIL";
+function renderQueue() {
+  const list = document.getElementById("fifo-list");
+  document.getElementById("queue-count").textContent = playerQueue.size();
+  list.innerHTML = "";
 
-    if (player) {
-      slot.innerHTML = `
-        <span class="slot-tag">${pointerLabel}</span>
-        <strong>${player.id}</strong>
-        <span>${player.region}</span>
-        <span class="slot-tag">${player.mode}</span>
-      `;
-    } else {
-      slot.innerHTML = `
-        <span class="slot-tag">${pointerLabel}</span>
-        <span>EMPTY</span>
-      `;
-    }
-
-    container.appendChild(slot);
+  if (playerQueue.isEmpty()) {
+    list.innerHTML = `<div class="empty-msg">Queue is empty. Add a player above or click "Load PPT Walkthrough".</div>`;
+    return;
   }
+
+  playerQueue.items.forEach((p, index) => {
+    const div = document.createElement("div");
+    div.className = "queue-item" + (index === 0 ? " front" : "");
+    div.innerHTML = `
+      <span><strong>#${index + 1} ${p.name}</strong> (${p.region} · ${p.slots} slots)</span>
+      <span class="queue-badge">${index === 0 ? "NEXT (HEAD)" : "WAITING"}</span>
+    `;
+    list.appendChild(div);
+  });
 }
 
-function renderMinHeap() {
-  const heapContainer = document.getElementById("heap-array");
-  heapContainer.innerHTML = "";
+function renderHeap() {
+  const container = document.getElementById("heap-array");
+  container.innerHTML = "";
 
-  minHeap.heap.forEach((srv, idx) => {
-    const loadPct = Math.round((srv.activePlayers / srv.maxCapacity) * 100);
+  serverHeap.heap.forEach((srv, idx) => {
+    const pct = Math.round((srv.usedSlots / srv.capacity) * 100);
     const node = document.createElement("div");
     node.className = "heap-node" + (idx === 0 ? " root" : "");
     node.innerHTML = `
-      <div class="idx">Heap[${idx}]${idx === 0 ? "(MIN ROOT)" : ""}</div>
-      <div><strong>${srv.id}</strong>
+      <div class="heap-idx">Index [${idx}] ${idx === 0 ? "• MIN ROOT" : ""}</div>
+      <div><strong>${srv.id}</strong> (${srv.region})</div>
+      <div>Load: ${pct}%</div>
+    `;
+    container.appendChild(node);
+  });
+}
+
+function renderServers() {
+  const grid = document.getElementById("server-grid");
+  grid.innerHTML = "";
+
+  const sorted = [...serverHeap.heap].sort((a, b) => a.id.localeCompare(b.id));
+
+  sorted.forEach(srv => {
+    const pct = Math.round((srv.usedSlots / srv.capacity) * 100);
+    const decision = serverDecisions[srv.id];
+
+    let cardClass = "server-card";
+    let tagHtml = "";
+
+    if (decision) {
+      cardClass += ` status-${decision.type}`;
+      tagHtml = `<span class="decision-tag tag-${decision.type}">${decision.label}</span>`;
+    }
+
+    let fillClass = "";
+    if (pct >= 80) fillClass = "high";
+    else if (pct >= 50) fillClass = "med";
+
+    const card = document.createElement("div");
+    card.className = cardClass;
+    card.innerHTML = `
+      <div class="server-top">
+        <span>${srv.id}</span>
+        <span>Load: ${pct}%</span>
+      </div>
+      <div class="server-sub">${srv.region} · ${srv.usedSlots}/${srv.capacity} slots used</div>
+      <div class="bar-bg">
+        <div class="bar-fill ${fillClass}" style="width: ${pct}%"></div>
+      </div>
+      ${tagHtml}
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function renderAll() {
+  renderQueue();
+  renderHeap();
+  renderServers();
+}
+
+// ==========================================
+// EVENT LISTENERS
+// ==========================================
+document.getElementById("enqueue-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const nameInput = document.getElementById("player-id");
+  const region = document.getElementById("player-region").value;
+  const slots = parseInt(document.getElementById("player-slots").value, 10) || 1;
+  const name = nameInput.value.trim() || `Player_${playerCounter}`;
+
+  playerQueue.enqueue({ name, region, slots });
+  addLog(`[ENQUEUE] ${name} (${region} · ${slots} slots) added to FIFO queue.`, "log-wait");
+
+  playerCounter++;
+  nameInput.value = `Player_${playerCounter}`;
+  renderAll();
+});
+
+document.getElementById("btn-random").addEventListener("click", () => {
+  const regions = ["India", "Singapore", "Europe"];
+  const slotOptions = [1, 2, 4, 5];
+
+  for (let i = 0; i < 3; i++) {
+    const name = `Player_${playerCounter++}`;
+    const region = regions[Math.floor(Math.random() * regions.length)];
+    const slots = slotOptions[Math.floor(Math.random() * slotOptions.length)];
+    playerQueue.enqueue({ name, region, slots });
+  }
+  document.getElementById("player-id").value = `Player_${playerCounter}`;
+  addLog("[ENQUEUE] Added 3 random player requests to FIFO queue.", "log-wait");
+  renderAll();
+});
+
+document.getElementById("btn-demo").addEventListener("click", () => {
+  initSystem(true);
+});
+
+document.getElementById("btn-step").addEventListener("click", matchNextPlayer);
+
+document.getElementById("btn-auto").addEventListener("click", e => {
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    e.target.textContent = "Auto-Run: OFF";
+  } else {
+    autoTimer = setInterval(() => {
+      if (!playerQueue.isEmpty()) matchNextPlayer();
+    }, 1500);
+    e.target.textContent = "Auto-Run: ON";
+  }
+});
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    document.getElementById("btn-auto").textContent = "Auto-Run: OFF";
+  }
+  initSystem(false);
+});
+
+// Boot with the PPT Walkthrough Scenario ready on load
+initSystem(true);
