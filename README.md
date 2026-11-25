@@ -20,7 +20,7 @@ A Data Structures mini-project that pairs incoming online players with optimal g
 2. Click **Load PPT Demo** to populate the sample queue (`Player_A`, `Player_B`, `Player_C`) or enqueue custom players.
 3. Click **Match Next Player** to step through each allocation and inspect the Min-Heap and system output logs.
 
-## Project Team (CSE201)
+## Project Team 
 * **Ashrit Reddy** — NB25ISE273
 * **Vineet Dadhwal** — NB25ISE269
 * **Hari Narayanan** — NB25ISE264
